@@ -76,6 +76,7 @@
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 18,
     className: 'dark-tiles',
+    referrerPolicy: 'strict-origin-when-cross-origin',
   }).addTo(map);
   const layer = L.layerGroup().addTo(map);
   const $ = (s) => document.querySelector(s);

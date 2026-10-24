@@ -67,6 +67,7 @@ TIME_ZONE = "UTC"
 USE_I18N = False
 USE_TZ = True
 STATIC_URL = "static/"
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 FUEL_PLANNER = {
     "DATA_DIR": BASE_DIR / "data",
