@@ -1,0 +1,4 @@
+-r requirements.txt
+# only needed to rebuild data/*.csv from the raw spreadsheet
+pandas
+openpyxl

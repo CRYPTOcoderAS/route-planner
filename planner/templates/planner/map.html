@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuel Route Planner</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1020; --panel: #121a2f; --card: #18223c; --line: #24304f;
+      --text: #e6ebf5; --muted: #8a96b3; --accent: #22c55e; --accent-2: #38bdf8; --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .app { display: grid; grid-template-columns: 400px 1fr; height: 100vh; }
+    aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 22px; }
+    h1 { font-size: 19px; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+    form { display: grid; gap: 10px; margin-bottom: 18px; }
+    label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
+    input { background: var(--card); border: 1px solid var(--line); color: var(--text); border-radius: 10px;
+      padding: 11px 12px; font: inherit; font-size: 14px; outline: none; }
+    input:focus { border-color: var(--accent-2); }
+    button { background: var(--accent); color: #04110a; border: 0; border-radius: 10px; padding: 12px;
+      font: inherit; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: progress; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .stat .v { font-size: 20px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .stat.hero { grid-column: span 2; background: linear-gradient(135deg, #14532d, #0f3b2a); border-color: #1f7a45; }
+    .stat.hero .v { font-size: 30px; }
+    .stops { display: grid; gap: 8px; }
+    .stop { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center;
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+    .stop:hover { border-color: var(--accent-2); }
+    .badge { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-2); color: #04121c;
+      display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+    .stop .name { font-weight: 600; font-size: 13px; }
+    .stop .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .stop .cost { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .stop .cost small { display: block; color: var(--muted); font-weight: 500; font-size: 11px; }
+    .section { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 18px 0 8px; }
+    .err { background: #3b1219; border: 1px solid #7f1d1d; color: #fecaca; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+    .foot { color: var(--muted); font-size: 11px; margin-top: 16px; line-height: 1.5; }
+    #map { height: 100%; background: #0e1424; }
+    .dark-tiles { filter: invert(1) hue-rotate(200deg) brightness(.9) contrast(.85) saturate(.6); }
+    .pin { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 12px Inter, sans-serif;
+      border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+    .leaflet-popup-content { font: 13px/1.45 Inter, sans-serif; }
+    @media (max-width: 860px) { .app { grid-template-columns: 1fr; grid-template-rows: auto 60vh; height: auto; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>⛽ Fuel Route Planner</h1>
+    <p class="sub">Cheapest fuel stops for a 500-mile-range, 10 MPG vehicle.</p>
+    <form id="f">
+      <label>Start <input name="start" value="{{ start }}" placeholder="City, ST or lat,lon" required></label>
+      <label>Finish <input name="finish" value="{{ finish }}" placeholder="City, ST or lat,lon" required></label>
+      <button id="go" type="submit">Plan route</button>
+    </form>
+    <div id="out"></div>
+  </aside>
+  <div id="map"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  const map = L.map('map', { zoomControl: true }).setView([39.5, -98.35], 4);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 18,
+    className: 'dark-tiles',
+  }).addTo(map);
+  const layer = L.layerGroup().addTo(map);
+  const $ = (s) => document.querySelector(s);
+  const usd = (n) => n == null ? '—' : n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pin = (html, bg) => L.divIcon({ className: '', html: `<div class="pin" style="background:${bg}">${html}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
+
+  async function plan(start, finish) {
+    $('#go').disabled = true; $('#go').textContent = 'Planning…';
+    history.replaceState(null, '', `?${new URLSearchParams({ start, finish })}`);
+    try {
+      const res = await fetch(`/api/v1/route/?${new URLSearchParams({ start, finish })}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+      render(data);
+    } catch (e) {
+      $('#out').innerHTML = `<div class="err">${esc(e.message)}</div>`;
+    } finally {
+      $('#go').disabled = false; $('#go').textContent = 'Plan route';
+    }
+  }
+
+  function render(d) {
+    layer.clearLayers();
+    const feats = d.map.geojson.features;
+    const route = feats.find((f) => f.properties.kind === 'route');
+    const line = L.geoJSON(route, { style: { color: '#38bdf8', weight: 5, opacity: .9 } }).addTo(layer);
+    for (const f of feats) {
+      const [lon, lat] = f.geometry.coordinates; const p = f.properties;
+      if (p.kind === 'start') L.marker([lat, lon], { icon: pin('A', '#22c55e') }).bindPopup(`<b>Start</b><br>${esc(p.name)}`).addTo(layer);
+      if (p.kind === 'finish') L.marker([lat, lon], { icon: pin('B', '#ef4444') }).bindPopup(`<b>Finish</b><br>${esc(p.name)}`).addTo(layer);
+      if (p.kind === 'fuel_stop') {
+        f.marker = L.marker([lat, lon], { icon: pin(p.stop, '#f59e0b') }).bindPopup(
+          `<b>Stop ${p.stop}: ${esc(p.name)}</b><br>${esc(p.city)} · mile ${p.mile_marker}<br>` +
+          `$${p.price_per_gallon.toFixed(3)}/gal × ${p.gallons} gal = <b>${usd(p.cost)}</b>`).addTo(layer);
+      }
+    }
+    map.fitBounds(line.getBounds(), { padding: [30, 30] });
+
+    const s = d.summary;
+    const stops = d.fuel_stops.map((st, i) => `
+      <div class="stop" data-i="${i}">
+        <div class="badge">${st.stop}</div>
+        <div><div class="name">${esc(st.station.name)}</div>
+          <div class="meta">${esc(st.station.city)}, ${st.station.state} · mile ${st.mile_marker} · $${st.station.price_per_gallon.toFixed(3)}/gal</div></div>
+        <div class="cost">${usd(st.cost)}<small>${st.gallons} gal</small></div>
+      </div>`).join('');
+    $('#out').innerHTML = `
+      <div class="stats">
+        <div class="stat hero"><div class="k">Total fuel cost</div><div class="v">${usd(s.total_fuel_cost)}</div></div>
+        <div class="stat"><div class="k">Distance</div><div class="v">${d.route.distance_miles.toLocaleString()} mi</div></div>
+        <div class="stat"><div class="k">Drive time</div><div class="v">${d.route.duration_hours.toFixed(1)} h</div></div>
+        <div class="stat"><div class="k">Fuel stops</div><div class="v">${s.num_stops}</div></div>
+        <div class="stat"><div class="k">Avg $/gal paid</div><div class="v">${s.avg_price_paid ? '$' + s.avg_price_paid.toFixed(3) : '—'}</div></div>
+      </div>
+      <div class="section">Fuel stops</div>
+      <div class="stops">${stops || '<div class="meta">No stop needed — a full tank covers this trip.</div>'}</div>
+      <div class="foot">${d.summary.stations_on_route} stations on route ·
+        ${d.meta.cached ? 'cached' : d.meta.routing_api_calls + ' routing call'} · ${d.meta.elapsed_ms} ms<br>
+        ${d.assumptions.map(esc).join('<br>')}</div>`;
+    const stopFeats = feats.filter((f) => f.properties.kind === 'fuel_stop');
+    document.querySelectorAll('.stop').forEach((el) => el.addEventListener('click', () => {
+      const m = stopFeats[+el.dataset.i].marker; map.setView(m.getLatLng(), 10); m.openPopup();
+    }));
+  }
+
+  $('#f').addEventListener('submit', (e) => {
+    e.preventDefault(); const fd = new FormData(e.target); plan(fd.get('start'), fd.get('finish'));
+  });
+  plan($('[name=start]').value, $('[name=finish]').value);
+</script>
+</body>
+</html>
