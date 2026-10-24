@@ -8,9 +8,14 @@ def env_bool(name: str, default: bool) -> bool:
     return os.environ.get(name, str(default)).lower() in {"1", "true", "yes"}
 
 
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
-DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",")
+DEBUG = env_bool("DJANGO_DEBUG", not ON_VERCEL)
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,.vercel.app").split(",")
+
+if ON_VERCEL:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",

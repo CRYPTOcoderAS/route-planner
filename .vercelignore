@@ -1,0 +1,7 @@
+.venv
+docs
+scripts
+data/fuel-prices-for-be-assessment.xlsx
+requirements-dev.txt
+postman_collection.json
+**/__pycache__
