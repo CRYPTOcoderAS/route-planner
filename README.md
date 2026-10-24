@@ -106,6 +106,18 @@ Errors return `{"error": "<kind>", "detail": "..."}`:
 | 422 | `no_fuel_in_range` | a stretch of the route is longer than 500 mi with no station |
 | 502 | `routing_failed` | OSRM is unavailable, or no drivable route exists |
 
+### `GET /api/v1/places/?q=dal&limit=8`
+
+City suggestions for the start and finish fields, used by the map's autocomplete. The search runs offline against the Census place list and takes under 1 ms.
+
+- Matches city names that start with the text typed. Adding a state narrows the list, e.g. `Dallas, T` or `chicago, illinois`.
+- The ~200 largest US cities rank first, then other places by size.
+- Every suggested label can be passed straight to `start` or `finish`.
+
+```json
+{"query": "dal", "results": [{"label": "Dallas, TX", "city": "Dallas", "state": "TX", "lat": 32.79333, "lon": -96.76651}]}
+```
+
 ---
 
 ## How it works

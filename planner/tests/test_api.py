@@ -71,3 +71,33 @@ class RouteApiTests(SimpleTestCase):
 
     def test_map_page_renders(self, fetch):
         self.assertContains(self.client.get("/map/", {"start": "Dallas, TX", "finish": "Austin, TX"}), "leaflet")
+
+
+class PlaceSuggestionTests(SimpleTestCase):
+    url = "/api/v1/places/"
+
+    def labels(self, q, **extra):
+        res = self.client.get(self.url, {"q": q, **extra})
+        self.assertEqual(res.status_code, 200)
+        return [r["label"] for r in res.json()["results"]]
+
+    def test_big_cities_rank_first(self):
+        self.assertEqual(self.labels("dal")[0], "Dallas, TX")
+        self.assertEqual(self.labels("new y")[0], "New York, NY")
+        self.assertEqual(self.labels("nash")[0], "Nashville, TN")
+
+    def test_state_filter_and_abbreviations(self):
+        self.assertEqual(self.labels("Dallas, T"), ["Dallas, TX"])
+        self.assertEqual(self.labels("chicago, illinois")[0], "Chicago, IL")
+        self.assertEqual(self.labels("st l")[0], "St. Louis, MO")
+
+    def test_limit_empty_and_cache_header(self):
+        self.assertEqual(len(self.labels("s", limit=3)), 3)
+        self.assertEqual(self.labels(""), [])
+        self.assertEqual(self.labels("zzzz"), [])
+        self.assertIn("max-age", self.client.get(self.url, {"q": "dal"})["Cache-Control"])
+
+    def test_every_suggestion_can_be_planned(self):
+        for q in ("dal", "st l", "nash", "fort w", "san"):
+            for label in self.labels(q):
+                self.assertTrue(resolve_location(label).lat, label)

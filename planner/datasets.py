@@ -69,10 +69,18 @@ class StationIndex:
 
 class PlaceIndex:
 
-    _ABBREV = [(r"\bst\.?\s", "saint "), (r"\bft\.?\s", "fort "), (r"\bmt\.?\s", "mount ")]
+    _ABBREV = [(r"\bst\.?\s", "saint "), (r"\bste\.?\s", "sainte "), (r"\bft\.?\s", "fort "),
+               (r"\bmt\.?\s", "mount "), (r"\bpt\.?\s", "point ")]
 
     def __init__(self, rows: list[dict]):
         self._by_key = {(r["key"], r["state"]): Place(r["name"], r["state"], float(r["lat"]), float(r["lon"])) for r in rows}
+        rows = sorted(rows, key=lambda r: r["key"])
+        self._keys = np.array([r["key"] for r in rows])
+        self._labels = [r["label"] for r in rows]
+        self._states = np.array([r["state"] for r in rows])
+        self._lat = np.array([float(r["lat"]) for r in rows])
+        self._lon = np.array([float(r["lon"]) for r in rows])
+        self._score = np.array([int(r["score"]) for r in rows], dtype=np.int64)
 
     @classmethod
     def normalize(cls, name: str) -> str:
@@ -84,6 +92,34 @@ class PlaceIndex:
 
     def lookup(self, city: str, state: str) -> Place | None:
         return self._by_key.get((self.normalize(city), state))
+
+    def suggest(self, query: str, limit: int = 8) -> list[dict]:
+        city, _, state_part = query.partition(",")
+        prefix = self.normalize(city)
+        if not prefix:
+            return []
+        lo = int(np.searchsorted(self._keys, prefix, side="left"))
+        hi = int(np.searchsorted(self._keys, prefix + "￿", side="left"))
+        idx = np.arange(lo, hi)
+        state_part = state_part.strip()
+        if state_part and idx.size:
+            codes = {code for name, code in STATE_NAMES.items() if name.startswith(state_part.lower())}
+            codes |= {c for c in STATE_CODES if c.startswith(state_part.upper())}
+            idx = idx[np.isin(self._states[idx], list(codes))]
+        idx = idx[np.argsort(-self._score[idx], kind="stable")]
+
+        results, seen = [], set()
+        for i in idx:
+            spot = (round(self._lat[i], 3), round(self._lon[i], 3))
+            if spot in seen:
+                continue
+            seen.add(spot)
+            label = f"{self._labels[i]}, {self._states[i]}"
+            results.append({"label": label, "city": self._labels[i], "state": str(self._states[i]),
+                            "lat": float(self._lat[i]), "lon": float(self._lon[i])})
+            if len(results) == limit:
+                break
+        return results
 
 
 @dataclass(frozen=True)

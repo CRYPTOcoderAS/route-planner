@@ -20,13 +20,27 @@
     h1 { font-size: 19px; margin: 0 0 4px; letter-spacing: -0.01em; }
     .sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
     form { display: grid; gap: 10px; margin-bottom: 18px; }
-    label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
+    label { font-size: 12px; color: var(--muted); margin-bottom: -4px; }
     input { background: var(--card); border: 1px solid var(--line); color: var(--text); border-radius: 10px;
       padding: 11px 12px; font: inherit; font-size: 14px; outline: none; }
     input:focus { border-color: var(--accent-2); }
     button { background: var(--accent); color: #04110a; border: 0; border-radius: 10px; padding: 12px;
       font: inherit; font-weight: 600; cursor: pointer; }
     button:disabled { opacity: .6; cursor: progress; }
+    .field { position: relative; display: grid; }
+    .field input { width: 100%; }
+    .suggest { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1000; margin: 0; padding: 4px;
+      list-style: none; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.45); max-height: 330px; overflow-y: auto; }
+    .suggest[hidden] { display: none; }
+    .suggest li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 10px;
+      border-radius: 7px; font-size: 14px; color: var(--text); cursor: pointer; }
+    .suggest li b { color: var(--accent-2); font-weight: 600; }
+    .suggest li .st { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--panel);
+      border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+    .suggest li[aria-selected="true"], .suggest li:hover { background: #22305a; }
+    .suggest .empty { color: var(--muted); cursor: default; font-size: 13px; }
+    .suggest .empty:hover { background: none; }
     .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
     .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
     .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
@@ -61,8 +75,18 @@
     <h1>⛽ Fuel Route Planner</h1>
     <p class="sub">Cheapest fuel stops for a 500-mile-range, 10 MPG vehicle.</p>
     <form id="f">
-      <label>Start <input name="start" value="{{ start }}" placeholder="City, ST or lat,lon" required></label>
-      <label>Finish <input name="finish" value="{{ finish }}" placeholder="City, ST or lat,lon" required></label>
+      <label for="start">Start</label>
+      <div class="field">
+        <input id="start" name="start" value="{{ start }}" placeholder="Start typing a US city…" autocomplete="off"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="start-list" required>
+        <ul class="suggest" id="start-list" role="listbox" hidden></ul>
+      </div>
+      <label for="finish">Finish</label>
+      <div class="field">
+        <input id="finish" name="finish" value="{{ finish }}" placeholder="Start typing a US city…" autocomplete="off"
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="finish-list" required>
+        <ul class="suggest" id="finish-list" role="listbox" hidden></ul>
+      </div>
       <button id="go" type="submit">Plan route</button>
     </form>
     <div id="out"></div>
@@ -83,6 +107,68 @@
   const usd = (n) => n == null ? '—' : n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pin = (html, bg) => L.divIcon({ className: '', html: `<div class="pin" style="background:${bg}">${html}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
+
+  const suggestCache = new Map();
+
+  function autocomplete(input) {
+    const list = document.getElementById(input.getAttribute('aria-controls'));
+    let items = [], active = -1, timer = null, seq = 0;
+
+    const close = () => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); active = -1; };
+    const highlight = (label, q) => {
+      const city = q.split(',')[0].trim();
+      const n = city.length;
+      return n && label.toLowerCase().startsWith(city.toLowerCase())
+        ? `<b>${esc(label.slice(0, n))}</b>${esc(label.slice(n))}` : esc(label);
+    };
+    const show = (results, q) => {
+      items = results; active = -1;
+      list.innerHTML = results.length
+        ? results.map((r, i) => `<li role="option" id="${list.id}-${i}" data-i="${i}" aria-selected="false">
+            <span>${highlight(r.city, q)}</span><span class="st">${esc(r.state)}</span></li>`).join('')
+        : '<li class="empty">No US city matches</li>';
+      list.hidden = false; input.setAttribute('aria-expanded', 'true');
+    };
+    const move = (step) => {
+      if (list.hidden || !items.length) return;
+      active = (active + step + items.length) % items.length;
+      list.querySelectorAll('li[role=option]').forEach((li, i) => li.setAttribute('aria-selected', String(i === active)));
+      input.setAttribute('aria-activedescendant', `${list.id}-${active}`);
+      list.children[active].scrollIntoView({ block: 'nearest' });
+    };
+    const pick = (i) => { input.value = items[i].label; close(); input.dispatchEvent(new Event('change')); };
+
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2 || /^-?\d/.test(q)) return close();
+      timer = setTimeout(async () => {
+        const mine = ++seq;
+        let results = suggestCache.get(q.toLowerCase());
+        if (!results) {
+          try {
+            const res = await fetch(`/api/v1/places/?${new URLSearchParams({ q, limit: 8 })}`);
+            results = (await res.json()).results;
+            suggestCache.set(q.toLowerCase(), results);
+          } catch { return; }
+        }
+        if (mine === seq && document.activeElement === input) show(results, q);
+      }, 120);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+      else if (e.key === 'Enter' && !list.hidden && items.length) { e.preventDefault(); pick(active < 0 ? 0 : active); }
+      else if (e.key === 'Escape') close();
+    });
+    list.addEventListener('mousedown', (e) => {
+      const li = e.target.closest('li[role=option]');
+      if (li) { e.preventDefault(); pick(+li.dataset.i); }
+    });
+    input.addEventListener('blur', () => setTimeout(close, 100));
+  }
+  autocomplete($('#start'));
+  autocomplete($('#finish'));
 
   async function plan(start, finish) {
     $('#go').disabled = true; $('#go').textContent = 'Planning…';

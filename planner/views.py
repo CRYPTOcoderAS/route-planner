@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from django.views.decorators.cache import cache_control
 from django.shortcuts import render
 from rest_framework import status
 from rest_framework.request import Request
@@ -40,6 +41,16 @@ def _error(code: int, kind: str, detail: str) -> Response:
 
 def health(request):
     return JsonResponse({"status": "ok", "stations_loaded": len(get_datasets().stations)})
+
+
+@cache_control(public=True, max_age=86400)
+def place_suggestions(request):
+    query = request.GET.get("q", "")[:80]
+    try:
+        limit = max(1, min(int(request.GET.get("limit", 8)), 20))
+    except ValueError:
+        limit = 8
+    return JsonResponse({"query": query, "results": get_datasets().places.suggest(query, limit)})
 
 
 def map_view(request):

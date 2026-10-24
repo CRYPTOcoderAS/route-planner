@@ -3,7 +3,12 @@
     "name": "Fuel Route Planner",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "variable": [{ "key": "base", "value": "http://127.0.0.1:8000" }],
+  "variable": [
+    {
+      "key": "base",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
   "item": [
     {
       "name": "Plan route (GET) - New York to Los Angeles",
@@ -11,10 +16,24 @@
         "method": "GET",
         "url": {
           "raw": "{{base}}/api/v1/route/?start=New York, NY&finish=Los Angeles, CA",
-          "host": ["{{base}}"], "path": ["api", "v1", "route", ""],
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "route",
+            ""
+          ],
           "query": [
-            { "key": "start", "value": "New York, NY" },
-            { "key": "finish", "value": "Los Angeles, CA" }
+            {
+              "key": "start",
+              "value": "New York, NY"
+            },
+            {
+              "key": "finish",
+              "value": "Los Angeles, CA"
+            }
           ]
         }
       }
@@ -23,18 +42,56 @@
       "name": "Plan route (POST) - Chicago to Houston, cheapest mode",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"start\": \"Chicago, IL\",\n  \"finish\": \"Houston, TX\",\n  \"mode\": \"cheapest\"\n}" },
-        "url": { "raw": "{{base}}/api/v1/route/", "host": ["{{base}}"], "path": ["api", "v1", "route", ""] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"start\": \"Chicago, IL\",\n  \"finish\": \"Houston, TX\",\n  \"mode\": \"cheapest\"\n}"
+        },
+        "url": {
+          "raw": "{{base}}/api/v1/route/",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "route",
+            ""
+          ]
+        }
       }
     },
     {
       "name": "Plan route (POST) - lat,lon input, half tank",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"start\": \"47.6062,-122.3321\",\n  \"finish\": \"25.7617,-80.1918\",\n  \"start_fuel_gallons\": 25\n}" },
-        "url": { "raw": "{{base}}/api/v1/route/", "host": ["{{base}}"], "path": ["api", "v1", "route", ""] }
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"start\": \"47.6062,-122.3321\",\n  \"finish\": \"25.7617,-80.1918\",\n  \"start_fuel_gallons\": 25\n}"
+        },
+        "url": {
+          "raw": "{{base}}/api/v1/route/",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "route",
+            ""
+          ]
+        }
       }
     },
     {
@@ -43,14 +100,73 @@
         "method": "GET",
         "url": {
           "raw": "{{base}}/api/v1/route/?start=Toronto, ON&finish=Dallas, TX",
-          "host": ["{{base}}"], "path": ["api", "v1", "route", ""],
-          "query": [{ "key": "start", "value": "Toronto, ON" }, { "key": "finish", "value": "Dallas, TX" }]
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "route",
+            ""
+          ],
+          "query": [
+            {
+              "key": "start",
+              "value": "Toronto, ON"
+            },
+            {
+              "key": "finish",
+              "value": "Dallas, TX"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "City suggestions (autocomplete)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base}}/api/v1/places/?q=dal&limit=8",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "places",
+            ""
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "dal"
+            },
+            {
+              "key": "limit",
+              "value": "8"
+            }
+          ]
         }
       }
     },
     {
       "name": "Health",
-      "request": { "method": "GET", "url": { "raw": "{{base}}/api/v1/health/", "host": ["{{base}}"], "path": ["api", "v1", "health", ""] } }
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base}}/api/v1/health/",
+          "host": [
+            "{{base}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "health",
+            ""
+          ]
+        }
+      }
     }
   ]
 }
