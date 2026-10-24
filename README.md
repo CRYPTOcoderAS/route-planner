@@ -10,6 +10,12 @@ A Django 6 API that takes a start and finish location in the USA and returns:
 
 It makes **one routing call per trip**. Geocoding and station lookup happen offline, and repeat requests are served from cache.
 
+**Live demo:**
+- Map: <https://route-planner-ivory.vercel.app/map/?start=New%20York,%20NY&finish=Los%20Angeles,%20CA>
+- API: <https://route-planner-ivory.vercel.app/api/v1/route/?start=Chicago,%20IL&finish=Houston,%20TX>
+
+The demo runs on Vercel's free tier, so the first request after an idle period can take a few seconds.
+
 | | |
 |---|---|
 | Framework | Django 6.1 + Django REST Framework, Python 3.12+ |
